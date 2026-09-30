@@ -1,6 +1,7 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Camera } from "@babylonjs/core/Cameras/camera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import "@babylonjs/core/Culling/ray";
 import { Target } from "../entities/Target";
 import { ImpactEffect } from "../effects/ImpactEffect";
 import { InputManager } from "../input/InputManager";

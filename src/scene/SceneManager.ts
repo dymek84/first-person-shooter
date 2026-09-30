@@ -1,6 +1,7 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import "@babylonjs/core/Collisions/collisionCoordinator";
 import { Environment } from "./Environment";
 import { PlayerController } from "../player/PlayerController";
 import { InputManager } from "../input/InputManager";
