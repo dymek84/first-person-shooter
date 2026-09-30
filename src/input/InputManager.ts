@@ -27,8 +27,8 @@ export class InputManager {
     this._onKeyDown = (e: KeyboardEvent) => {
       this._pressedKeys.add(e.code);
 
-      // Trigger reload event on R key press
-      if (e.code === "KeyR" && !e.repeat && this._isPointerLocked) {
+      // Trigger reload/restart event on R key press
+      if (e.code === "KeyR" && !e.repeat) {
         this.onReload?.();
       }
     };

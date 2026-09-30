@@ -16,6 +16,7 @@ export class PlayerController {
   private readonly _camera: UniversalCamera;
   private readonly _canvas: HTMLCanvasElement;
   private readonly _scene: Scene;
+  private readonly _spawnPosition: Vector3;
   private _isPointerLocked: boolean = false;
 
   private readonly _onCanvasClick: () => void;
@@ -25,11 +26,14 @@ export class PlayerController {
     this._scene = scene;
     this._canvas = canvas;
 
-    const spawn = options.spawnPosition ?? new Vector3(0, 1.8, -5);
-    this._camera = new UniversalCamera("firstPersonCamera", spawn, this._scene);
+    this._spawnPosition = options.spawnPosition ? options.spawnPosition.clone() : new Vector3(0, 1.8, -5);
+    this._camera = new UniversalCamera("firstPersonCamera", this._spawnPosition.clone(), this._scene);
 
     // Initial orientation: look forward along +Z
-    this._camera.setTarget(new Vector3(spawn.x, spawn.y, spawn.z + 10));
+    this._camera.setTarget(new Vector3(this._spawnPosition.x, this._spawnPosition.y, this._spawnPosition.z + 10));
+
+    // Near clipping plane tailored for first-person viewmodel visibility
+    this._camera.minZ = 0.05;
 
     // Attach camera controls to canvas
     this._camera.attachControl(this._canvas, true);
@@ -76,6 +80,15 @@ export class PlayerController {
 
   public get isPointerLocked(): boolean {
     return this._isPointerLocked;
+  }
+
+  /**
+   * Resets player camera position to spawn and re-aligns forward view.
+   */
+  public reset(): void {
+    this._camera.position.copyFrom(this._spawnPosition);
+    this._camera.setTarget(new Vector3(this._spawnPosition.x, this._spawnPosition.y, this._spawnPosition.z + 10));
+    this._camera.cameraDirection.set(0, 0, 0);
   }
 
   public dispose(): void {

@@ -5,6 +5,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { IDamageable } from "../combat/Damage";
 
 export interface TargetOptions {
   id: string;
@@ -16,7 +17,7 @@ export interface TargetOptions {
  * Represents an interactive target entity with hitpoints,
  * hit reaction flash, and destruction state.
  */
-export class Target {
+export class Target implements IDamageable {
   private readonly _id: string;
   private readonly _maxHealth: number;
   private _currentHealth: number;
@@ -93,8 +94,8 @@ export class Target {
     centerAccent.isPickable = true;
     centerAccent.parent = root;
 
-    // Tag all pickable elements with reference to this Target instance
-    const metadata = { targetInstance: this };
+    // Tag all pickable elements with reference to this Target instance and damageable contract
+    const metadata = { targetInstance: this, damageable: this };
     body.metadata = metadata;
     centerAccent.metadata = metadata;
     stand.metadata = metadata;
@@ -108,6 +109,10 @@ export class Target {
    */
   public receiveDamage(amount: number): void {
     if (this._isDestroyed) {
+      return;
+    }
+
+    if (amount <= 0) {
       return;
     }
 
@@ -152,6 +157,24 @@ export class Target {
     });
   }
 
+  /**
+   * Resets the target back to maximum hitpoints and active visibility.
+   */
+  public reset(): void {
+    this._isDestroyed = false;
+    this._currentHealth = this._maxHealth;
+    if (this._flashTimeoutId !== null) {
+      clearTimeout(this._flashTimeoutId);
+      this._flashTimeoutId = null;
+    }
+    this._targetMaterial.emissiveColor = new Color3(0, 0, 0);
+    this._rootMesh.setEnabled(true);
+    this._rootMesh.getChildMeshes().forEach((child) => {
+      child.checkCollisions = true;
+      child.isPickable = true;
+    });
+  }
+
   public get id(): string {
     return this._id;
   }
@@ -165,6 +188,10 @@ export class Target {
   }
 
   public get isDestroyed(): boolean {
+    return this._isDestroyed;
+  }
+
+  public get isDead(): boolean {
     return this._isDestroyed;
   }
 

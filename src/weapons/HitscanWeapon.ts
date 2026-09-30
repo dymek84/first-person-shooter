@@ -2,6 +2,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { Camera } from "@babylonjs/core/Cameras/camera";
 import "@babylonjs/core/Culling/ray";
 import { Target } from "../entities/Target";
+import { IDamageable } from "../combat/Damage";
 import { ImpactEffect } from "../effects/ImpactEffect";
 import { InputManager } from "../input/InputManager";
 import { IWeapon, IWeaponAmmoState, WeaponConfig, ShotResult } from "./IWeapon";
@@ -26,6 +27,21 @@ export class HitscanWeapon implements IWeapon {
 
   private _lastFireTime: number = 0;
   private _debugEnabled: boolean = true;
+
+  /**
+   * Whether the weapon is enabled to fire. Disabled upon player death.
+   */
+  public isEnabled: boolean = true;
+
+  /**
+   * Callback executed immediately after a successful shot is fired.
+   */
+  public onFire?: (result: ShotResult) => void;
+
+  /**
+   * Callback executed when firing is attempted with an empty magazine.
+   */
+  public onDryFire?: () => void;
 
   constructor(
     scene: Scene,
@@ -77,6 +93,10 @@ export class HitscanWeapon implements IWeapon {
    * Returns whether the weapon has cooled down, is not reloading, and has available ammo.
    */
   public canFire(): boolean {
+    if (!this.isEnabled) {
+      return false;
+    }
+
     if (this._isReloading) {
       return false;
     }
@@ -135,7 +155,29 @@ export class HitscanWeapon implements IWeapon {
    * Attempts to fire the weapon. Returns ShotResult if fired, or null if gated by cooldown, empty magazine, reloading, or pointer lock.
    */
   public tryFire(): ShotResult | null {
+    if (!this.isEnabled) {
+      return null;
+    }
+
     if (!this._inputManager.isPointerLocked) {
+      return null;
+    }
+
+    if (this._isReloading) {
+      return null;
+    }
+
+    // Dry-fire feedback when magazine is empty
+    if (this._currentAmmo <= 0) {
+      const now = performance.now();
+      const cooldownMs = 1000 / this._config.fireRate;
+      if (now - this._lastFireTime >= cooldownMs) {
+        this._lastFireTime = now;
+        this.onDryFire?.();
+        if (this._debugEnabled) {
+          console.log(`[COMBAT-DEBUG] [Dry Fire] ${this._config.name} -> Click (No ammo)`);
+        }
+      }
       return null;
     }
 
@@ -144,7 +186,9 @@ export class HitscanWeapon implements IWeapon {
     }
 
     this._lastFireTime = performance.now();
-    return this.fire();
+    const result = this.fire();
+    this.onFire?.(result);
+    return result;
   }
 
   /**
@@ -154,27 +198,48 @@ export class HitscanWeapon implements IWeapon {
     // Consume 1 magazine round
     this._currentAmmo--;
 
-    // Cast forward raycast
+    // Cast forward raycast, explicitly excluding any first-person viewmodel meshes
     const ray = this._camera.getForwardRay(this._config.range);
     const pickInfo = this._scene.pickWithRay(ray, (mesh) => {
-      return mesh.isPickable && mesh.isEnabled();
+      return mesh.isPickable && mesh.isEnabled() && !mesh.metadata?.isViewModel;
     });
 
     let result: ShotResult;
 
     if (pickInfo && pickInfo.hit && pickInfo.pickedMesh && pickInfo.pickedPoint) {
-      const target = Target.fromMesh(pickInfo.pickedMesh);
+      let damageable: IDamageable | null = null;
+      let target: Target | undefined = undefined;
+      let entityName = "Target";
 
-      if (target && !target.isDestroyed) {
-        target.receiveDamage(this._config.damage);
+      if (pickInfo.pickedMesh.metadata?.damageable) {
+        damageable = pickInfo.pickedMesh.metadata.damageable as IDamageable;
+        entityName = damageable.id ?? "Entity";
+        if (damageable instanceof Target) {
+          target = damageable;
+        }
+      } else {
+        const foundTarget = Target.fromMesh(pickInfo.pickedMesh);
+        if (foundTarget) {
+          damageable = foundTarget;
+          target = foundTarget;
+          entityName = foundTarget.id;
+        }
+      }
+
+      if (damageable && !damageable.isDestroyed) {
+        damageable.receiveDamage(this._config.damage);
         ImpactEffect.create(this._scene, pickInfo.pickedPoint);
 
         if (this._debugEnabled) {
+          const hpInfo =
+            damageable.currentHealth !== undefined && damageable.maxHealth !== undefined
+              ? ` | HP: ${damageable.currentHealth}/${damageable.maxHealth}`
+              : "";
           console.log(
-            `[COMBAT-DEBUG] [Shot Fired] ${this._config.name} -> HIT Target "${target.id}" | Damage: ${this._config.damage} | Target HP: ${target.currentHealth}/${target.maxHealth} | Mag: ${this._currentAmmo}/${this._config.magazineSize}`
+            `[COMBAT-DEBUG] [Shot Fired] ${this._config.name} -> HIT "${entityName}" | Damage: ${this._config.damage}${hpInfo} | Mag: ${this._currentAmmo}/${this._config.magazineSize}`
           );
-          if (target.isDestroyed) {
-            console.log(`[COMBAT-DEBUG] [Target Destroyed] Target "${target.id}" was destroyed!`);
+          if (damageable.isDestroyed) {
+            console.log(`[COMBAT-DEBUG] [Entity Destroyed] "${entityName}" was destroyed!`);
           }
         }
 
@@ -182,9 +247,10 @@ export class HitscanWeapon implements IWeapon {
           fired: true,
           hit: true,
           target,
+          damageable,
           hitPoint: pickInfo.pickedPoint,
           damageDealt: this._config.damage,
-          targetDestroyed: target.isDestroyed
+          targetDestroyed: damageable.isDestroyed
         };
       } else {
         if (this._debugEnabled) {
@@ -211,11 +277,27 @@ export class HitscanWeapon implements IWeapon {
     return result;
   }
 
+  /**
+   * Resets weapon ammo, timers, and active status.
+   */
+  public reset(): void {
+    if (this._reloadTimerId !== null) {
+      clearTimeout(this._reloadTimerId);
+      this._reloadTimerId = null;
+    }
+    this._isReloading = false;
+    this._currentAmmo = this._config.magazineSize;
+    this._reserveAmmo = this._config.reserveAmmo;
+    this._lastFireTime = 0;
+    this.isEnabled = true;
+  }
+
   public dispose(): void {
     if (this._reloadTimerId !== null) {
       clearTimeout(this._reloadTimerId);
       this._reloadTimerId = null;
     }
     this._isReloading = false;
+    this.isEnabled = false;
   }
 }

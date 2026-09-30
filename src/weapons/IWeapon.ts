@@ -1,4 +1,5 @@
 import { Target } from "../entities/Target";
+import { IDamageable } from "../combat/Damage";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 export interface WeaponConfig {
@@ -23,6 +24,7 @@ export interface ShotResult {
   fired: boolean;
   hit: boolean;
   target?: Target;
+  damageable?: IDamageable;
   hitPoint?: Vector3;
   damageDealt?: number;
   targetDestroyed?: boolean;
@@ -31,9 +33,13 @@ export interface ShotResult {
 export interface IWeapon {
   readonly config: WeaponConfig;
   readonly ammoState: IWeaponAmmoState;
+  isEnabled: boolean;
+  onFire?: (result: ShotResult) => void;
+  onDryFire?: () => void;
   tryFire(): ShotResult | null;
   fire(): ShotResult;
   reload(): boolean;
+  reset(): void;
   canFire(): boolean;
   dispose(): void;
 }
