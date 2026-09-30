@@ -23,10 +23,76 @@
         touch-action: none;
         outline: none;
       }
+
+      /* Centered screen crosshair */
+      #crosshair {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 20px;
+        pointer-events: none;
+        user-select: none;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .ch-dot {
+        position: absolute;
+        width: 3px;
+        height: 3px;
+        background-color: rgba(255, 255, 255, 0.95);
+        border-radius: 50%;
+        box-shadow: 0 0 2px rgba(0, 0, 0, 0.85);
+      }
+
+      .ch-line {
+        position: absolute;
+        background-color: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 0 2px rgba(0, 0, 0, 0.85);
+      }
+
+      .ch-top {
+        width: 2px;
+        height: 6px;
+        top: 0;
+        left: 9px;
+      }
+
+      .ch-bottom {
+        width: 2px;
+        height: 6px;
+        bottom: 0;
+        left: 9px;
+      }
+
+      .ch-left {
+        width: 6px;
+        height: 2px;
+        left: 0;
+        top: 9px;
+      }
+
+      .ch-right {
+        width: 6px;
+        height: 2px;
+        right: 0;
+        top: 9px;
+      }
     </style>
-    <script type="module" crossorigin src="/assets/index-CzDeN7qk.js"></script>
+    <script type="module" crossorigin src="/assets/index-v-71dRgB.js"></script>
   </head>
   <body>
+    <div id="crosshair" aria-hidden="true">
+      <div class="ch-dot"></div>
+      <div class="ch-line ch-top"></div>
+      <div class="ch-line ch-bottom"></div>
+      <div class="ch-line ch-left"></div>
+      <div class="ch-line ch-right"></div>
+    </div>
     <canvas id="renderCanvas"></canvas>
   </body>
 </html>
