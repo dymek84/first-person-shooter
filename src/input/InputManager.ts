@@ -8,6 +8,11 @@ export class InputManager {
   private _isLeftMouseDown: boolean = false;
   private _isPointerLocked: boolean = false;
 
+  /**
+   * Optional callback triggered when the reload key ('KeyR') is pressed while pointer lock is active.
+   */
+  public onReload?: () => void;
+
   private readonly _onKeyDown: (e: KeyboardEvent) => void;
   private readonly _onKeyUp: (e: KeyboardEvent) => void;
   private readonly _onPointerDown: (e: PointerEvent) => void;
@@ -21,6 +26,11 @@ export class InputManager {
 
     this._onKeyDown = (e: KeyboardEvent) => {
       this._pressedKeys.add(e.code);
+
+      // Trigger reload event on R key press
+      if (e.code === "KeyR" && !e.repeat && this._isPointerLocked) {
+        this.onReload?.();
+      }
     };
 
     this._onKeyUp = (e: KeyboardEvent) => {
@@ -79,7 +89,7 @@ export class InputManager {
   }
 
   /**
-   * Returns whether a given key code (e.g. 'KeyW', 'Space') is currently held down.
+   * Returns whether a given key code (e.g. 'KeyW', 'KeyR', 'Space') is currently held down.
    */
   public isKeyDown(code: string): boolean {
     return this._pressedKeys.has(code);
@@ -112,5 +122,6 @@ export class InputManager {
     window.removeEventListener("blur", this._onWindowBlur);
     this._pressedKeys.clear();
     this._isLeftMouseDown = false;
+    this.onReload = undefined;
   }
 }

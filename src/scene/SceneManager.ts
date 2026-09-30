@@ -7,10 +7,11 @@ import { PlayerController } from "../player/PlayerController";
 import { InputManager } from "../input/InputManager";
 import { HitscanWeapon } from "../weapons/HitscanWeapon";
 import { Target } from "../entities/Target";
+import { CombatHUD } from "../ui/CombatHUD";
 
 /**
  * Manages the scene lifecycle, global scene physics/collisions,
- * and initializes the environment, player, input, targets, and weapon.
+ * and initializes the environment, player, input, targets, weapon, and combat HUD.
  */
 export class SceneManager {
   private readonly _scene: Scene;
@@ -19,6 +20,7 @@ export class SceneManager {
   private readonly _inputManager: InputManager;
   private readonly _weapon: HitscanWeapon;
   private readonly _targets: Target[];
+  private readonly _combatHUD: CombatHUD;
 
   constructor(engine: Engine, canvas: HTMLCanvasElement) {
     this._scene = new Scene(engine);
@@ -42,13 +44,24 @@ export class SceneManager {
       new Target(this._scene, { id: "Target-C", position: new Vector3(3, 0, 5), maxHealth: 100 })
     ];
 
-    // Hitscan weapon casting forward ray from camera center
+    // Hitscan weapon casting forward ray from camera center with 12-round mag & 60-round reserve
     this._weapon = new HitscanWeapon(this._scene, this._playerController.camera, this._inputManager, {
       name: "Standard Carbine",
       damage: 25,
       fireRate: 4,
-      range: 100
+      range: 100,
+      magazineSize: 12,
+      reserveAmmo: 60,
+      reloadDurationMs: 1500
     });
+
+    // Combat HUD overlay displaying ammunition and reload state
+    this._combatHUD = new CombatHUD();
+
+    // Hook reload input to weapon
+    this._inputManager.onReload = () => {
+      this._weapon.reload();
+    };
   }
 
   public get scene(): Scene {
@@ -75,17 +88,26 @@ export class SceneManager {
     return this._targets;
   }
 
+  public get combatHUD(): CombatHUD {
+    return this._combatHUD;
+  }
+
   public render(): void {
     // Check continuous firing input while pointer lock is active
     if (this._inputManager.isLeftMouseDown) {
       this._weapon.tryFire();
     }
 
+    // Synchronize HUD with weapon state
+    this._combatHUD.update(this._weapon.ammoState);
+
     this._scene.render();
   }
 
   public dispose(): void {
     this._targets.forEach((target) => target.dispose());
+    this._weapon.dispose();
+    this._combatHUD.dispose();
     this._inputManager.dispose();
     this._playerController.dispose();
     this._scene.dispose();
